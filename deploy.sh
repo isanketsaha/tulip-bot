@@ -15,8 +15,6 @@ echo "Installing dependencies..."
 pip install -r requirements.txt --target $PACKAGE_DIR/
 
 echo "Packaging Lambda function..."
-# Remove old zip file if it exists
-rm -f $ZIP_FILE
 
 # Navigate to the package directory and zip dependencies
 cd $PACKAGE_DIR
@@ -27,9 +25,12 @@ cd ..
 zip -g $ZIP_FILE src/* templates/*
 
 echo "Uploading to AWS Lambda..."
-aws lambda update-function-code \
-   --function-name $LAMBDA_NAME \
-   --zip-file fileb://$ZIP_FILE \
-   --p tulip-test
+#aws lambda update-function-code \
+#   --function-name $LAMBDA_NAME \
+#   --zip-file fileb://$ZIP_FILE \
+#   --p tulip-test
 
+rm -r $PACKAGE_DIR
+
+rm -f $ZIP_FILE
 echo "Deployment complete!"

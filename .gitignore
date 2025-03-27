@@ -12,6 +12,8 @@ pyvenv.cfg
 .venv
 pip-selfcheck.json
 
+.
+
 ### Python template
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -157,4 +159,5 @@ cython_debug/
 
 report-lambda.zip
 
-/package/
+/package
+.DS_Store
