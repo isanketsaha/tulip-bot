@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.5;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        th {
+            background-color: #f4f4f4;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <p>Leave Summary of {{ leave_summary|length }} Employee for the month of <strong>{{ month_name }}</strong>. Please find below the leave summary below.</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Employee Name</th>
+                <th>Total Leaves</th>
+                <th>Leave Dates</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for employee, leave_dates in leave_summary.items() %}
+            <tr>
+                <td>{{ employee }}</td>
+                <td>{{ leave_dates|length }}</td>
+                <td>{{ ', '.join(leave_dates) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p><em>This is an auto-generated email. Please do not reply to this message.</em></p>
+</body>
+</html>

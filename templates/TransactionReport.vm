@@ -1,0 +1,34 @@
+<html>
+<body>
+    <p>Hello,</p>
+   <p>
+        Your account <strong>{{ accountNumber }}</strong> has a conflict on <strong>{{ date }}</strong>.
+        According to the records, SBI reported an amount of <strong>INR {{ amount }}</strong>,
+        while the portal shows a revenue of <strong>INR {{ portalAmount }}</strong>.
+        The difference between the two is
+        <strong style="color: red;">INR {{ difference }}</strong>.
+    </p>
+
+    <h3>Detailed Summary from Portal</h3>
+    <table border="1" cellpadding="5" cellspacing="0">
+        <tr>
+            <th>Category</th>
+            <th>Amount (INR)</th>
+        </tr>
+        <tr>
+            <td>Fee</td>
+            <td>{{ fees }}</td>
+        </tr>
+        <tr>
+            <td>Purchase</td>
+            <td>{{ purchase }}</td>
+        </tr>
+        <tr>
+            <td>Expenses</td>
+            <td>{{ expense }}</td>
+        </tr>
+    </table>
+    <p>Bot</p>
+    <p><em>This is an auto-generated email. Please do not reply to this message.</em></p>
+</body>
+</html>
