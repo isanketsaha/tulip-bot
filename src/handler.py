@@ -1,107 +1,63 @@
 import email
-import json
-import logging
-import os
-from datetime import datetime
-from typing import Dict
-import traceback
+from datetime import datetime, timedelta
+from email.message import EmailMessage
+from typing import Dict, Union, List
 
-from src.api import TulipApi
-from src.models import BankTransaction
-from src.services import EmailService
-from src.utils import get_text_from_mime_message, filter_english_lines, extract_message
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+from src.daily_transaction import TransactionReportHandler
+from src.utils import aws_session, logger
 
 
-class TransactionReportHandler:
+class Handle:
     def __init__(self):
-        self.api = TulipApi()
-        self.email_service = EmailService()
-        self.regex = r"Your A/C (\w+) Credited INR ([\d,]+\.\d{2}) on (\d{2}/\d{2}/\d{2})"
-        self.parseRegex = r"Your A/C\s+(?P<account>X{5}\d{6})\s+(?P<transaction>Credited)\s+INR(?P<amount> \d{1,3}(?:,\d{3})*\.\d{2})\s+on\s+(?P<date>\d{2}/\d{2}/\d{2})\s+-Deposit by transfer from\s+(?P<source>[A-Z\s\.]+)\.\s+Avl Bal\s+(?P<balance>INR \d{1,3}(?:,\d{3})*)"
-        self.expected_sender = os.environ.get('senderEmail')  # Configure this
+        self.invoke_type = ""
 
-    def handle_request(self, event: Dict, context: Dict) -> str:
-        logger.info(f"Received input: {event}")
-        logger.info(f"Received context: {context}")
-
-        if 'Records' not in event:
-            logger.warning("No SNS records found in event")
-            return "No records processed"
-
-        for record in event['Records']:
-            notification = json.loads(record['Sns']['Message'])
-            logger.info(f"SNS records = {notification}")
-
-            try:
-                email_content = notification.get('content')
-                mime_message = email.message_from_string(email_content)
-                logger.info(f"Message Body = {mime_message}",)
-                from_addr = email.utils.parseaddr(mime_message['from'])[1]
-                body = get_text_from_mime_message(mime_message)
-                english_lines = [extract_message(line) for line in filter_english_lines(body, self.regex)]
-                # Find bank transaction
-                bank_transaction = next(
-                    (BankTransaction(self.parseRegex, line)
-                     for line in english_lines
-                     if line.startswith("Your A/C")),
-                    None
-                )
-
-                dashboard_amount = self.transaction_detail(bank_transaction.date)
-                diff = float(bank_transaction.amount.replace(',', '')) \
-                       - float(dashboard_amount["portalAmount"].replace(',', ''))
-                if from_addr == self.expected_sender and bank_transaction.type == 'Credited':
-                    dashboard_amount.update({
-                        "subject": "ALERT! School Transaction Report",
-                        "accountNumber": bank_transaction.account_number,
-                        "amount": bank_transaction.amount,
-                        "date": bank_transaction.date,
-                        "difference": f"{diff:,}"
-                    })
-                    logger.info("Email matches criteria.")
-                    self.email_service.process_email(dashboard_amount, "TransactionReport.vm")
-                    return "Processed Successfully"
-                else:
-                    logger.info(f"Email does not match criteria or no amount difference. Ignoring sender - {from_addr}")
-
-            except Exception as e:
-                logger.error(f"Error processing SNS record: {traceback.format_exc()}")
-                raise
-
-        return "No records processed"
-
-    def transaction_detail(self, date: str) -> dict:
-        date = datetime.strptime(date, "%d/%m/%y")
-        date = date.strftime("%Y-%m-%d")
-        transactions = self.api.get("/report/transaction/" + date)
-        total = 0
-        totals_by_type = {"fees": 0.0, "purchase": 0.0, "expense": 0.0}
-        for txn in transactions:
-            if txn["paymentMode"] == "CASH":
-                pay_type = txn["payType"].lower()
-                total += float(txn["total"])
-            if pay_type in totals_by_type:
-                totals_by_type[pay_type] += float(txn["total"])
-        totals_by_type["portalAmount"] = f"{total:,}"
-        return totals_by_type
+    def handle_request(self, event: Dict, context: Dict) -> dict[str, Union[str, int]]:
+        print("Event received:")
+        print(event)
+        handler = TransactionReportHandler()
+        handler.handle_request(getObject())
+        getObject()
+        return {
+            "statusCode": 200,
+            "body": "Success"
+        }
 
 
-# Example usage with AWS Lambda
+def getObject():
+    target_date = datetime.now().date() - timedelta(days=1)  # Process yesterday's emails
+    logger.info(f"Processing emails for date: {target_date}")
+
+    # List all objects in the bucket
+    paginator = aws_session().client('s3').get_paginator('list_objects_v2')
+    processed_count = 0
+
+    for page in paginator.paginate(Bucket="email-0a62a9e0"):
+        if 'Contents' not in page:
+            logger.info("No objects found in bucket")
+            continue
+        list_of_obj: List = []
+        for obj in page['Contents']:
+            last_modified = obj['LastModified'].date()  # Get object's modification date
+
+            # Filter objects by the target date
+            if last_modified == target_date:
+                key = obj['Key']
+                logger.info(f"Processing email: {key}")
+
+                # Fetch the email from S3
+                response = aws_session().client('s3').get_object(Bucket="email-0a62a9e0", Key=key)
+                mime_message = email.message_from_string(response['Body'].read().decode('utf-8', errors='ignore'))
+                # if not isinstance(mime_message, EmailMessage):
+                #     logger.warning(f"Failed to parse email content for {key}")
+                #     continue
+                list_of_obj.append(mime_message)
+    return list_of_obj
+
+
 def lambda_handler(event, context):
-    handler = TransactionReportHandler()
+    handler = Handle()
     return handler.handle_request(event, context)
 
 
-# For local testing
 if __name__ == "__main__":
-    # Load the JSON from the file
-    with open('test.json', 'r') as file:
-        json_data = json.load(file)
-
-    # Sample event for testing
-    sample_context = {}
-    result = lambda_handler(json_data, sample_context)
-    print(result)
+    lambda_handler("", "")
