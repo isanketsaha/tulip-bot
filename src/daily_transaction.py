@@ -20,7 +20,7 @@ class TransactionReportHandler:
         self.api = TulipApi()
         self.email_service = EmailService()
         self.regex = r"Your A/C (\w+) Credited INR ([\d,]+\.\d{2}) on (\d{2}/\d{2}/\d{2})"
-        self.parseRegex = r"Your A/C\s+(?P<account>X{5}\d{6})\s+(?P<transaction>Credited)\s+INR(?P<amount> \d{1,3}(?:,\d{3})*\.\d{2})\s+on\s+(?P<date>\d{2}/\d{2}/\d{2})\s+-Deposit by transfer from\s+(?P<source>[A-Z\s\.]+)\.\s+Avl Bal\s+(?P<balance>INR \d{1,3}(?:,\d{3})*)"
+        self.parseRegex = r'Your A/C\s+(?P<account>X{5}\d{6})\s+(?P<transaction>Credited|Debited)\s+INR\s+(?P<amount>[\d,]+\.\d{2})\s+on\s+(?P<date>\d{2}/\d{2}/\d{2})'
         self.expected_sender = os.environ.get('senderEmail')  # Configure this
 
     def handle_request(self, event: List) -> Union[dict[str, Union[str, int]], str]:
@@ -47,22 +47,21 @@ class TransactionReportHandler:
                 total_amount += sum(float(transaction.amount.replace(',', ''))
                                     for transaction in list_transactions
                                     if transaction.type == 'Credited')
-                dashboard_amount = self.transaction_detail(bank_transaction.date)
+                dashboard_amount = self.transaction_detail(list_transactions[0].date)
                 diff = total_amount - float(dashboard_amount["portalAmount"])
-                if bank_transaction.type == 'Credited':
-                    dashboard_amount.update({
-                        "subject": "ALERT! School Transaction Report",
-                        "accountNumber": list_transactions[0].account_number,
-                        "amount": f"{total_amount:,}",
-                        "date": list_transactions[0].date,
-                        "difference": f"{diff:,}"
-                    })
-                    logger.info("Email matches criteria.")
-                    self.email_service.process_email(dashboard_amount, "TransactionReport.vm")
-                    return {
-                        "statusCode": 200,
-                        "body": "Emails Processed Successfully"
-                    }
+                dashboard_amount.update({
+                    "subject": "ALERT! School Transaction Report",
+                    "accountNumber": list_transactions[0].account_number,
+                    "amount": f"{total_amount:,}",
+                    "date": list_transactions[0].date,
+                    "difference": f"{diff:,}"
+                })
+                logger.info("Email matches criteria.")
+                self.email_service.process_email(dashboard_amount, "TransactionReport.vm")
+                return {
+                    "statusCode": 200,
+                    "body": "Emails Processed Successfully"
+                }
         except Exception as e:
             logger.error(f"Error processing email record: {traceback.format_exc()}")
             return {
