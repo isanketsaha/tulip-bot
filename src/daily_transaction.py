@@ -25,50 +25,39 @@ class TransactionReportHandler:
         self.expected_sender = os.environ.get('senderEmail')  # Configure this
 
     def handle_request(self) -> Union[dict[str, Union[str, int]], str]:
-        try:
-            list_transactions = []
-            total_amount = 0.0
-            for mime_message in self.get_s3_emails():
-                if email.utils.parseaddr(mime_message['from'])[1] == self.expected_sender:
-                    body = get_text_from_mime_message(mime_message)
-                    logger.info(f"Message Body = {body}")
-                    english_lines = [extract_message(line) for line in filter_english_lines(body, self.regex)]
-                    # Find bank transaction
-                    bank_transaction = next(
-                        (BankTransaction(self.parseRegex, line)
-                         for line in english_lines if line.startswith("Your A/C")), None)
-                    list_transactions.append(bank_transaction)
-            if not list_transactions:
-                logger.info(f"No email for today or no match sender")
-                return {
-                    "statusCode": 200,
-                    "body": "No email for today or no match sender"
-                }
-            else:
-                total_amount += sum(float(transaction.amount.replace(',', ''))
-                                    for transaction in list_transactions
-                                    if transaction.type == 'Credited')
-                dashboard_amount = self.transaction_detail(list_transactions[0].date)
-                diff = total_amount - float(dashboard_amount["portalAmount"])
-                dashboard_amount.update({
-                    "subject": "ALERT! School Transaction Report",
-                    "accountNumber": list_transactions[0].account_number,
-                    "amount": f"{total_amount:,}",
-                    "date": list_transactions[0].date,
-                    "difference": f"{diff:,}"
-                })
-                logger.info("Email matches criteria.")
-                self.email_service.process_email(dashboard_amount, "TransactionReport.html")
-                return {
-                    "statusCode": 200,
-                    "body": "Emails Processed Successfully"
-                }
-        except Exception as e:
-            logger.error(f"Error processing email record: {traceback.format_exc()}")
+        list_transactions = []
+        total_amount = 0.0
+        for mime_message in self.get_s3_emails():
+            if email.utils.parseaddr(mime_message['from'])[1] == self.expected_sender:
+                body = get_text_from_mime_message(mime_message)
+                logger.info(f"Message Body = {body}")
+                english_lines = [extract_message(line) for line in filter_english_lines(body, self.regex)]
+                # Find bank transaction
+                bank_transaction = next(
+                    (BankTransaction(self.parseRegex, line)
+                     for line in english_lines if line.startswith("Your A/C")), None)
+                list_transactions.append(bank_transaction)
+        if not list_transactions:
+            logger.info(f"No email for today or no match sender")
             return {
-                "statusCode": 404,
-                "body": "Errors while processing email"
+                "statusCode": 200,
+                "body": "No email for today or no match sender"
             }
+        else:
+            total_amount += sum(float(transaction.amount.replace(',', ''))
+                                for transaction in list_transactions
+                                if transaction.type == 'Credited')
+            dashboard_amount = self.transaction_detail(list_transactions[0].date)
+            diff = total_amount - float(dashboard_amount["portalAmount"])
+            dashboard_amount.update({
+                "subject": "ALERT! School Transaction Report",
+                "accountNumber": list_transactions[0].account_number,
+                "amount": f"{total_amount:,}",
+                "date": list_transactions[0].date,
+                "difference": f"{diff:,}"
+            })
+            logger.info("Email matches criteria.")
+            self.email_service.process_email(dashboard_amount, "TransactionReport.html")
 
     def transaction_detail(self, date: str) -> dict:
         date = datetime.strptime(date, "%d/%m/%y")
@@ -83,7 +72,7 @@ class TransactionReportHandler:
         return totals_by_type
 
     def get_s3_emails(self):
-        target_date = datetime.now().date() - timedelta(days=1)
+        target_date = datetime.now().date()
         logger.info(f"Processing emails for date: {target_date}")
         paginator = aws_session().client('s3').get_paginator('list_objects_v2')
 

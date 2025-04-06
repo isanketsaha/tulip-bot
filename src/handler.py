@@ -1,5 +1,6 @@
 import email
 import os
+import traceback
 from datetime import datetime, timedelta
 from email.message import EmailMessage
 from typing import Dict, Union, List
@@ -11,11 +12,22 @@ from src.utils import aws_session, logger
 
 class Handle:
 
-    def handle_request(self, event: Dict, context: Dict) -> dict[str, Union[str, int]]:
-        print("Event received")
-        print(event)
-        invoke = self.handle().get(event['ruleName'], lambda: "Invalid selection")()
-        invoke.handle_request()
+    def handle_request(self, event: Dict, context: Dict):
+        try:
+            print("Event received")
+            print(event)
+            invoke = self.handle().get(event['ruleName'], lambda: "Invalid selection")()
+            invoke.handle_request()
+            return {
+                "statusCode": 200,
+                "body": "Emails Processed Successfully"
+            }
+        except Exception as e:
+            logger.error(f"Error processing email record: {traceback.format_exc()}")
+            return {
+                "statusCode": 404,
+                "body": "Errors while processing email"
+            }
 
     def handle(self):
         return {
