@@ -1,0 +1,40 @@
+{% extends "base_email.html" %}
+
+{% block content %}
+<h1>Low Stock Inventory Alert</h1>
+<p>Dear Management Team,</p>
+<p>This automated alert is to inform you that the following inventory items have reached critically low stock levels and require immediate attention.</p>
+
+<h2>Items Requiring Restock:</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Item ID</th>
+            <th>Item Name</th>
+            <th>Size</th>
+            <th>Type</th>
+            <th>Available Qty</th>
+            <th>Vendor</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in low_stock_items %}
+        <tr>
+            <td>{{ item.id }}</td>
+            <td>{{ item.product.itemName }}</td>
+            <td>{{ item.product.size }}</td>
+            <td>{{ item.product.type }}</td>
+            <td class="{% if item.availableQty <= 3 %}critical{% elif item.availableQty <= 10 %}warning{% endif %}">
+                {{ item.availableQty }}
+            </td>
+            <td>{{ item.vendor }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<p>Please take immediate action to restock these items to avoid disruptions.</p>
+
+<p>Regards,<br>
+Inventory Management System</p>
+{% endblock %}

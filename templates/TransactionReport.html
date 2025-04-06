@@ -1,5 +1,7 @@
-<html>
-<body>
+{% extends "base_email.html" %}
+
+{% block content %}
+
     <p>Hello,</p>
    <p>
         Your account <strong>{{ accountNumber }}</strong> has a conflict on <strong>{{ date }}</strong>.
@@ -28,7 +30,4 @@
             <td>{{ expense }}</td>
         </tr>
     </table>
-    <p>Bot</p>
-    <p><em>This is an auto-generated email. Please do not reply to this message.</em></p>
-</body>
-</html>
+{% endblock %}

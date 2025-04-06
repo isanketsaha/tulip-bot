@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    {% include 'styles.html' %}
+</head>
+<body>
+    <div class="container">
+
+        {% block content %}
+        <!-- Child templates will insert their content here -->
+        {% endblock %}
+
+        {% include 'footer.html' %}
+    </div>
+</body>
+</html>

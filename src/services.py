@@ -1,10 +1,12 @@
 import traceback
+from datetime import datetime
+
 from botocore.exceptions import ClientError
 from typing import Dict
 import logging
 import os
 
-from jinja2 import Template
+from jinja2 import Template, Environment, FileSystemLoader
 
 from src.utils import logger, aws_session
 
@@ -19,6 +21,7 @@ class EmailService:
         self.sender = "bot@inbox.tulipschool.co.in"
         self.recipient = os.environ.get('recipientEmail')
         self.template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
+        self.env = Environment(loader=FileSystemLoader('../templates'))
 
     def process_email(self, data: Dict, template_name: str) -> None:
         logger.info(f"Processing email with data: {data} using template: {template_name}")
@@ -29,20 +32,24 @@ class EmailService:
 
         # Load and merge the template
         try:
-            template_path = os.path.join(self.template_dir, template_name)
-            if not os.path.exists(template_path):
-                logger.error(f"Template file not found: {template_path}")
-                raise FileNotFoundError(f"Template {template_name} not found in {self.template_dir}")
+            # template_path = os.path.join(self.template_dir, template_name)
+            # if not os.path.exists(template_path):
+            #     logger.error(f"Template file not found: {template_path}")
+            #     raise FileNotFoundError(f"Template {template_name} not found in {self.template_dir}")
+            #
+            # with open(template_path, 'r') as file:
+            #     template_content = file.read()
+            #     template = Template(template_content)
+            #     html_body = template.render(data)
 
-            with open(template_path, 'r') as file:
-                template_content = file.read()
-                template = Template(template_content)
-                html_body = template.render(data)
-            # # Merge template with data
-            # body_html = _merge_template(template_content, data)
-
-            # Send the email via SES
-            response = self._send_raw_email(self.recipient, data.get("subject"), html_body)
+            if data is None:
+                data = {}
+            data.update({
+                'current_date': datetime.now().strftime("%Y-%m-%d %H:%M"),
+                'support_email': 'support@yourcompany.com'
+            })
+            template = self.env.get_template(template_name)
+            response = self._send_raw_email(self.recipient, data.get("subject"), template.render(**data))
             logger.info(f"Email sent successfully. Message ID: {response['MessageId']}")
 
         except FileNotFoundError as e:

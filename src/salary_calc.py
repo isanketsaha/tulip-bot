@@ -52,7 +52,7 @@ class SalaryCalculator:
             "year": date.strftime("%Y"),
             "leave_summary": group_by_filter(data)
         }
-        self.email_service.process_email(leave_data, 'OfficeTime.vm')
+        self.email_service.process_email(leave_data, 'OfficeTime.html')
 
 
 if __name__ == "__main__":

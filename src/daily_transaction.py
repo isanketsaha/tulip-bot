@@ -2,14 +2,14 @@ import email
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Union
 import traceback
 
 from src.api import TulipApi
 from src.models import BankTransaction
 from src.services import EmailService
-from src.utils import get_text_from_mime_message, filter_english_lines, extract_message
+from src.utils import get_text_from_mime_message, filter_english_lines, extract_message, aws_session
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -18,16 +18,17 @@ logger.setLevel(logging.INFO)
 class TransactionReportHandler:
     def __init__(self):
         self.api = TulipApi()
+        self.bucket_name = os.environ.get('bucket_name')
         self.email_service = EmailService()
         self.regex = r"Your A/C (\w+) Credited INR ([\d,]+\.\d{2}) on (\d{2}/\d{2}/\d{2})"
         self.parseRegex = r'Your A/C\s+(?P<account>X{5}\d{6})\s+(?P<transaction>Credited|Debited)\s+INR\s+(?P<amount>[\d,]+\.\d{2})\s+on\s+(?P<date>\d{2}/\d{2}/\d{2})'
         self.expected_sender = os.environ.get('senderEmail')  # Configure this
 
-    def handle_request(self, event: List) -> Union[dict[str, Union[str, int]], str]:
+    def handle_request(self) -> Union[dict[str, Union[str, int]], str]:
         try:
             list_transactions = []
             total_amount = 0.0
-            for mime_message in event:
+            for mime_message in self.get_s3_emails():
                 if email.utils.parseaddr(mime_message['from'])[1] == self.expected_sender:
                     body = get_text_from_mime_message(mime_message)
                     logger.info(f"Message Body = {body}")
@@ -57,7 +58,7 @@ class TransactionReportHandler:
                     "difference": f"{diff:,}"
                 })
                 logger.info("Email matches criteria.")
-                self.email_service.process_email(dashboard_amount, "TransactionReport.vm")
+                self.email_service.process_email(dashboard_amount, "TransactionReport.html")
                 return {
                     "statusCode": 200,
                     "body": "Emails Processed Successfully"
@@ -81,20 +82,23 @@ class TransactionReportHandler:
                 totals_by_type["portalAmount"] += txn['total']
         return totals_by_type
 
+    def get_s3_emails(self):
+        target_date = datetime.now().date() - timedelta(days=1)
+        logger.info(f"Processing emails for date: {target_date}")
+        paginator = aws_session().client('s3').get_paginator('list_objects_v2')
 
-# Example usage with AWS Lambda
-def lambda_handler(event, context):
-    handler = TransactionReportHandler()
-    return handler.handle_request(event, context)
+        for page in paginator.paginate(Bucket=self.bucket_name):
+            if 'Contents' not in page:
+                logger.info("No objects found in bucket")
+                continue
+            list_of_obj: List = []
+            for obj in page['Contents']:
+                last_modified = obj['LastModified'].date()
 
-
-# For local testing
-if __name__ == "__main__":
-    # Load the JSON from the file
-    with open('test.json', 'r') as file:
-        json_data = json.load(file)
-
-    # Sample event for testing
-    sample_context = {}
-    result = lambda_handler(json_data, sample_context)
-    print(result)
+                if last_modified == target_date:
+                    key = obj['Key']
+                    logger.info(f"Processing email: {key}")
+                    response = aws_session().client('s3').get_object(Bucket=self.bucket_name, Key=key)
+                    mime_message = email.message_from_string(response['Body'].read().decode('utf-8', errors='ignore'))
+                    list_of_obj.append(mime_message)
+        return list_of_obj
