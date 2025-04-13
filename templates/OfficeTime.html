@@ -1,26 +1,8 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.5;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-        }
-        th {
-            background-color: #f4f4f4;
-            text-align: left;
-        }
-    </style>
-</head>
-<body>
+{% extends "base_email.html" %}
+
+{% block content %}
+
+<p>Dear Management Team,</p>
     <p>Leave Summary of {{ leave_summary|length }} Employee for the month of <strong>{{ month_name }}</strong>. Please find below the leave summary below.</p>
     <table>
         <thead>
@@ -40,6 +22,4 @@
             {% endfor %}
         </tbody>
     </table>
-    <p><em>This is an auto-generated email. Please do not reply to this message.</em></p>
-</body>
-</html>
+{% endblock %}
