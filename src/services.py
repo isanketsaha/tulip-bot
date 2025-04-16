@@ -20,8 +20,10 @@ class EmailService:
         self.ses_client = aws_session().client('ses')
         self.sender = "bot@inbox.tulipschool.co.in"
         self.recipient = os.environ.get('recipientEmail')
-        self.template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
-        self.env = Environment(loader=FileSystemLoader('../templates'))
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        # Find templates folder relative to the script location
+        # templates_dir = os.path.join(current_dir, 'templates')
+        self.env = Environment(loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), "..", "templates")))
 
     def process_email(self, data: Dict, template_name: str) -> None:
         logger.info(f"Processing email with data: {data} using template: {template_name}")
